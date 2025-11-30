@@ -499,4 +499,3 @@ function AdminView({ registros, selectedDate, setSelectedDate, loading }) {
       </div>
     </div>
   );
-}
