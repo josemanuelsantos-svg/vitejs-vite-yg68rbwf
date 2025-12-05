@@ -1,36 +1,33 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { 
-  Users, CheckCircle, ChefHat, Send, School, ArrowLeft, 
+  Users, CheckCircle, ChefHat, School, ArrowLeft, 
   Calendar, UtensilsCrossed, Ticket, History, 
   Lock, AlertCircle, Salad, Bot, BookOpen, Plus, Trash2,
   RefreshCw, WifiOff, ShieldCheck, Link2, HelpCircle, X,
-  Shapes, Backpack, Info, Edit3
+  Shapes, Backpack, Info, Edit3, UserX, AlertTriangle, UserCheck, Printer
 } from 'lucide-react';
 import { initializeApp } from "firebase/app";
 import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "firebase/auth";
 import { getFirestore, collection, doc, setDoc, onSnapshot, query, where } from "firebase/firestore";
 
 // --- ZONA DE CONFIGURACIÓN ---
-// Esta lógica detecta si estás en el chat (usando config interna) o en tu web (usando tus claves)
-const firebaseConfig = typeof __firebase_config !== 'undefined' 
-  ? JSON.parse(__firebase_config) 
-  : {
-      apiKey: "AIzaSyBlgbaGrSIjdaqXI0SVbZgdim5z8uNzBxs",
-      authDomain: "comedorcsb.firebaseapp.com",
-      projectId: "comedorcsb",
-      storageBucket: "comedorcsb.firebasestorage.app",
-      messagingSenderId: "310874789678",
-      appId: "1:310874789678:web:65442102af5aec75bd0cbf",
-      measurementId: "G-CDLDNM330N"
-    };
+const firebaseConfig = {
+  apiKey: "AIzaSyBlgbaGrSIjdaqXI0SVbZgdim5z8uNzBxs",
+  authDomain: "comedorcsb.firebaseapp.com",
+  projectId: "comedorcsb",
+  storageBucket: "comedorcsb.firebasestorage.app",
+  messagingSenderId: "310874789678",
+  appId: "1:310874789678:web:65442102af5aec75bd0cbf",
+  measurementId: "G-CDLDNM330N"
+};
 // -----------------------------
 
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
 
-// Usamos el ID del entorno para la previsualización, o tu proyecto real para la web
-const appId = typeof __app_id !== 'undefined' ? __app_id : 'comedorcsb';
+// ID fijo para producción
+const appId = 'comedorcsb';
 
 const getLocalISODate = () => {
   const d = new Date();
@@ -51,11 +48,7 @@ export default function App() {
     let mounted = true;
     const initAuth = async () => {
       try {
-        if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
-          await signInWithCustomToken(auth, __initial_auth_token);
-        } else {
-          await signInAnonymously(auth);
-        }
+        await signInAnonymously(auth);
       } catch (error) {
         console.error("Auth Error:", error);
         if(mounted) setAuthError(true);
@@ -76,12 +69,10 @@ export default function App() {
     setLoadingData(true);
     const targetDate = view === 'teacher' ? getLocalISODate() : selectedDate; 
     
-    // Si estamos en el chat, usamos la ruta de prueba. Si estamos en tu web, usamos la ruta normal.
-    const collectionRef = typeof __app_id !== 'undefined' 
-      ? collection(db, 'artifacts', appId, 'public', 'data', 'registros_comedor')
-      : collection(db, 'registros_comedor');
-
-    const q = query(collectionRef, where('fecha', '==', targetDate));
+    const q = query(
+      collection(db, 'registros_diarios'), 
+      where('fecha', '==', targetDate)
+    );
     
     const unsubscribe = onSnapshot(q, (snapshot) => {
       const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
@@ -97,24 +88,23 @@ export default function App() {
   if (!user && authError) return (
     <div className="p-10 text-center text-red-600 font-bold bg-red-50 h-screen flex flex-col items-center justify-center gap-4">
       <WifiOff className="w-12 h-12" />
-      <p>Error de conexión con la base de datos.</p>
+      <p>Error de conexión. Verifica la configuración de Firebase.</p>
       <button onClick={() => window.location.reload()} className="px-4 py-2 bg-red-600 text-white rounded-lg">Reintentar</button>
     </div>
   );
   
   if (!user) return <div className="p-10 text-center text-slate-500 animate-pulse h-screen flex items-center justify-center">Cargando App...</div>;
 
-  const syncId = appId.slice(-6).toUpperCase();
-
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-800 font-sans pb-24 relative">
-      <header className="bg-white border-b border-slate-200 sticky top-0 z-20 shadow-sm">
+    <div className="min-h-screen bg-slate-50 text-slate-800 font-sans pb-24 relative print:pb-0 print:bg-white">
+      {/* Cabecera oculta al imprimir */}
+      <header className="bg-white border-b border-slate-200 sticky top-0 z-20 shadow-sm print:hidden">
         <div className="bg-slate-800 text-white text-[10px] py-1 px-4 flex justify-center items-center gap-4">
           <div className="flex items-center gap-1">
              <Link2 className="w-3 h-3 text-green-400" />
-             <span>SALA: <span className="font-bold text-yellow-400 font-mono">{syncId}</span></span>
+             <span>SALA: <span className="font-bold text-yellow-400 font-mono">ONLINE</span></span>
           </div>
-          <button onClick={()=>setShowHelp(true)} className="underline text-slate-400 hover:text-white">¿Ayuda?</button>
+          <button onClick={()=>setShowHelp(true)} className="underline text-slate-400 hover:text-white">Ayuda</button>
         </div>
         <div className="max-w-3xl mx-auto px-4 h-14 flex items-center justify-between">
           <div className="flex items-center gap-2">
@@ -134,18 +124,18 @@ export default function App() {
       </header>
 
       {showHelp && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-in fade-in">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-in fade-in print:hidden">
           <div className="bg-white p-6 rounded-xl max-w-xs w-full shadow-2xl relative">
              <button onClick={()=>setShowHelp(false)} className="absolute top-2 right-2 p-2"><X className="w-5 h-5 text-slate-400"/></button>
-             <h3 className="font-bold text-lg mb-2">Conexión</h3>
-             <p className="text-sm text-slate-600 mb-4">Código de sala: <strong>{syncId}</strong>.</p>
+             <h3 className="font-bold text-lg mb-2">Conexión Segura</h3>
+             <p className="text-sm text-slate-600 mb-4">Estás conectado a la base de datos oficial.</p>
           </div>
         </div>
       )}
 
-      <main className="max-w-3xl mx-auto p-4">
+      <main className="max-w-3xl mx-auto p-4 print:p-0 print:max-w-none">
         {view === 'teacher' ? (
-          <TeacherView db={db} user={user} registrosHoy={registros} appId={appId} />
+          <TeacherView db={db} user={user} registrosHoy={registros} />
         ) : (
           <AdminView registros={registros} selectedDate={selectedDate} setSelectedDate={setSelectedDate} loading={loadingData} />
         )}
@@ -154,15 +144,22 @@ export default function App() {
   );
 }
 
-function TeacherView({ db, user, registrosHoy, appId }) {
+function TeacherView({ db, user, registrosHoy }) {
   const [step, setStep] = useState(1);
-  const [formData, setFormData] = useState({ etapa: '', curso: '', letra: '', fijos: 0, tickets: 0, catequesis: 0, robotica: 0 });
+  const [formData, setFormData] = useState({ 
+    etapa: '', curso: '', letra: '', 
+    fijos: 0, tickets: 0, 
+    catequesis: 0, robotica: 0,
+    ausencias: '',
+    profesorNombre: '',
+    profesorSeQueda: false
+  });
   const [especiales, setEspeciales] = useState([]); 
   const [nuevoEspecial, setNuevoEspecial] = useState({ nombre: '', dietaBlanda: false, nota: '' });
   const [showSpecialForm, setShowSpecialForm] = useState(false);
   const [sending, setSending] = useState(false);
   const [completed, setCompleted] = useState(false);
-  const [isEditing, setIsEditing] = useState(false); // Estado para controlar edición
+  const [isEditing, setIsEditing] = useState(false);
 
   const extraOptions = useMemo(() => {
     const dayOfWeek = new Date().getDay();
@@ -178,7 +175,7 @@ function TeacherView({ db, user, registrosHoy, appId }) {
   }, [formData.etapa, formData.curso]);
 
   const resetForm = () => {
-    setFormData({ etapa: '', curso: '', letra: '', fijos: 0, tickets: 0, catequesis: 0, robotica: 0 });
+    setFormData({ etapa: '', curso: '', letra: '', fijos: 0, tickets: 0, catequesis: 0, robotica: 0, ausencias: '', profesorNombre: '', profesorSeQueda: false });
     setEspeciales([]);
     setNuevoEspecial({ nombre: '', dietaBlanda: false, nota: '' });
     setShowSpecialForm(false);
@@ -205,10 +202,8 @@ function TeacherView({ db, user, registrosHoy, appId }) {
 
   const currentTotal = (Number(formData.fijos) || 0) + (Number(formData.tickets) || 0);
   
-  // Buscar si ya existe registro
   const yaRegistrado = useMemo(() => registrosHoy.find(r => r.etapa === formData.etapa && r.curso === formData.curso && r.letra === formData.letra), [registrosHoy, formData]);
 
-  // Función para cargar datos existentes y activar modo edición
   const enableEditMode = () => {
     if (yaRegistrado) {
         setFormData({
@@ -218,7 +213,10 @@ function TeacherView({ db, user, registrosHoy, appId }) {
             fijos: yaRegistrado.fijos,
             tickets: yaRegistrado.tickets,
             catequesis: yaRegistrado.catequesis || 0,
-            robotica: yaRegistrado.robotica || 0
+            robotica: yaRegistrado.robotica || 0,
+            ausencias: yaRegistrado.ausencias || '',
+            profesorSeQueda: !!yaRegistrado.profesorNombre,
+            profesorNombre: yaRegistrado.profesorNombre || ''
         });
         if (yaRegistrado.especiales) setEspeciales(yaRegistrado.especiales);
         setIsEditing(true);
@@ -226,26 +224,26 @@ function TeacherView({ db, user, registrosHoy, appId }) {
   };
 
   const handleSubmit = async () => {
-    // Si ya existe y NO estamos editando, no hacer nada (aunque la UI lo bloquea antes)
     if (yaRegistrado && !isEditing) return;
-    
     if (showSpecialForm && nuevoEspecial.nombre.trim().length > 0) {
         alert("⚠️ Tienes un niño escrito pero NO añadido. Pulsa 'Añadir' primero."); return;
     }
+    if (formData.profesorSeQueda && !formData.profesorNombre.trim()) {
+        alert("⚠️ Has marcado que el profesor se queda, pero falta el nombre."); return;
+    }
+
     setSending(true);
     const today = getLocalISODate();
     const docId = `${today}_${formData.etapa}_${formData.curso}_${formData.letra}`;
     
-    // Ruta adaptativa para entorno de pruebas o producción
-    const collectionRef = typeof __app_id !== 'undefined' 
-      ? collection(db, 'artifacts', appId, 'public', 'data', 'registros_comedor')
-      : collection(db, 'registros_comedor');
-
     try {
-      await setDoc(doc(collectionRef, docId), {
+      await setDoc(doc(db, 'registros_diarios', docId), {
         fecha: today, timestamp: Date.now(), etapa: formData.etapa, curso: formData.curso, letra: formData.letra,
         fijos: Number(formData.fijos)||0, tickets: Number(formData.tickets)||0, total: currentTotal,
-        catequesis: Number(formData.catequesis)||0, robotica: Number(formData.robotica)||0, especiales: especiales, registradoPor: user.uid
+        catequesis: Number(formData.catequesis)||0, robotica: Number(formData.robotica)||0, 
+        ausencias: formData.ausencias,
+        profesorNombre: formData.profesorSeQueda ? formData.profesorNombre : '',
+        especiales: especiales, registradoPor: user.uid
       });
       setSending(false); setCompleted(true);
     } catch (error) { alert("Error al guardar."); setSending(false); }
@@ -340,6 +338,21 @@ function TeacherView({ db, user, registrosHoy, appId }) {
                    </div>
                 </div>
 
+                <div className="bg-indigo-50 p-4 rounded-xl border border-indigo-200">
+                  <div className="flex items-center justify-between mb-3">
+                    <span className="font-bold text-indigo-900 flex gap-2 items-center"><UserCheck className="w-5 h-5" /> Profesor/a se queda</span>
+                    <label className="relative inline-flex items-center cursor-pointer">
+                      <input type="checkbox" className="sr-only peer" checked={formData.profesorSeQueda} onChange={(e) => setFormData({...formData, profesorSeQueda: e.target.checked})} />
+                      <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-indigo-600"></div>
+                    </label>
+                  </div>
+                  {formData.profesorSeQueda && (
+                    <div className="animate-in fade-in slide-in-from-top-1">
+                      <input type="text" placeholder="Nombre del profesor/a" className="w-full p-2 border border-indigo-300 rounded-lg outline-none focus:ring-2 focus:ring-indigo-200" value={formData.profesorNombre} onChange={(e) => setFormData({...formData, profesorNombre: e.target.value})} />
+                    </div>
+                  )}
+                </div>
+
                 {(extraOptions.showCatequesis || extraOptions.showRobotica) && (
                   <div className="bg-indigo-50 p-4 rounded-xl border border-indigo-100 space-y-3">
                     <h3 className="text-xs font-bold text-indigo-800 uppercase tracking-wider">Actividades Extra</h3>
@@ -367,6 +380,19 @@ function TeacherView({ db, user, registrosHoy, appId }) {
                   }
                 </div>
 
+                <div className="bg-orange-50 p-4 rounded-xl border border-orange-200 mt-4">
+                  <h3 className="font-bold text-orange-800 flex items-center gap-2 mb-2 text-sm uppercase tracking-wide">
+                    <AlertTriangle className="w-4 h-4" /> Alérgicos Ausentes
+                  </h3>
+                  <textarea 
+                    className="w-full p-3 rounded-lg border border-orange-300 text-sm focus:ring-2 focus:ring-orange-200 outline-none text-slate-700 bg-white"
+                    placeholder="Escribe aquí si ha faltado algún niño con alergia hoy... (Ej: Falta María - Celiaca)"
+                    rows={2}
+                    value={formData.ausencias || ''}
+                    onChange={(e) => setFormData({...formData, ausencias: e.target.value})}
+                  />
+                </div>
+
                 <div className="pt-4 border-t border-slate-100">
                   <div className="flex justify-between items-center mb-4 px-2"><span className="font-bold text-slate-600">Total Platos:</span><span className="text-3xl font-black text-slate-800">{currentTotal}</span></div>
                   <button onClick={handleSubmit} disabled={sending} className="w-full bg-slate-900 text-white font-bold py-4 rounded-xl shadow-lg flex justify-center items-center gap-3 active:scale-95 transition-all disabled:opacity-70 disabled:cursor-not-allowed">
@@ -386,12 +412,19 @@ function TeacherView({ db, user, registrosHoy, appId }) {
 function AdminView({ registros, selectedDate, setSelectedDate, loading }) {
   const stats = useMemo(() => {
     let totInf = 0, totPri = 0;
+    let totTickets = 0;
     const infantil = [];
     const primaria = [];
+    let totalDietas = 0;
+    let totalAusencias = 0;
 
-    // Separar por etapa y calcular totales
     registros.forEach(r => {
-        const t = (Number(r.fijos)||0) + (Number(r.tickets)||0);
+        const fijos = Number(r.fijos) || 0;
+        const tickets = Number(r.tickets) || 0;
+        const t = fijos + tickets;
+        
+        totTickets += tickets;
+
         if(r.etapa === 'Infantil') {
             totInf += t;
             infantil.push(r);
@@ -399,9 +432,10 @@ function AdminView({ registros, selectedDate, setSelectedDate, loading }) {
             totPri += t;
             primaria.push(r);
         }
+        if(r.especiales) totalDietas += r.especiales.length;
+        if(r.ausencias) totalAusencias++;
     });
 
-    // Función de ordenación: Curso -> Letra
     const sortFn = (a, b) => {
         if (a.curso !== b.curso) return a.curso.localeCompare(b.curso);
         return a.letra.localeCompare(b.letra);
@@ -410,49 +444,41 @@ function AdminView({ registros, selectedDate, setSelectedDate, loading }) {
     infantil.sort(sortFn);
     primaria.sort(sortFn);
 
-    const ordenados = [...infantil, ...primaria];
-
-    return { totInf, totPri, total: totInf + totPri, ordenados, infantil, primaria };
+    return { totInf, totPri, total: totInf + totPri, totTickets, infantil, primaria, totalDietas, totalAusencias };
   }, [registros]);
 
-  const handleSendEmail = () => {
-    const d = new Date(selectedDate).toLocaleDateString('es-ES');
-    let body = `COMEDOR ${d}\nTOTAL: ${stats.total} (Inf: ${stats.totInf}, Pri: ${stats.totPri})\n\n`;
-    
-    // Función auxiliar para formatear la lista en el email
-    const formatList = (list, title) => {
-      if(list.length === 0) return '';
-      let text = `--- ${title} ---\n`;
-      list.forEach(r => {
-        const f=Number(r.fijos)||0, t=Number(r.tickets)||0;
-        text += `${r.curso}-${r.letra}: ${f+t} (${f} fijos, ${t} tickets)`;
-        if(r.catequesis) text+=` | Cat: ${r.catequesis}`; if(r.robotica) text+=` | Rob: ${r.robotica}`;
-        text+='\n';
-        if(r.especiales?.length) r.especiales.forEach(e => text+=`   -> ${e.nombre}: ${e.dietaBlanda?'Blanda. ':''}${e.nota||''}\n`);
-      });
-      return text + '\n';
-    };
-
-    body += formatList(stats.infantil, 'INFANTIL');
-    body += formatList(stats.primaria, 'PRIMARIA');
-
-    window.location.href = `mailto:comedor@sanbuenaventura.org?subject=Comedor ${d}&body=${encodeURIComponent(body)}`;
+  const handlePrint = () => {
+    window.print();
   };
 
-  // Renderizado de cada fila de la tabla
   const renderRow = (r) => (
-    <div key={r.id} className="p-3 hover:bg-slate-50 transition-colors">
+    <div key={r.id} className="p-3 hover:bg-slate-50 transition-colors break-inside-avoid">
        <div className="flex justify-between font-bold text-slate-700 mb-1">
          <span>{r.curso} {r.letra}</span>
          <span className="text-black text-lg">{(r.fijos||0)+(r.tickets||0)}</span>
        </div>
-       <div className="text-xs text-slate-500 mb-1 flex flex-wrap gap-2">
-           <span className="bg-blue-100 text-blue-700 px-1 rounded">{r.fijos||0} Fijos</span>
-           <span className="bg-yellow-100 text-yellow-700 px-1 rounded">{r.tickets||0} Tickets</span>
-           {r.catequesis>0 && <span className="bg-indigo-100 text-indigo-700 px-1 rounded flex gap-1 items-center"><BookOpen className="w-3 h-3"/> {r.catequesis}</span>}
-           {r.robotica>0 && <span className="bg-indigo-100 text-indigo-700 px-1 rounded flex gap-1 items-center"><Bot className="w-3 h-3"/> {r.robotica}</span>}
+       <div className="text-xs text-slate-500 mb-1 flex flex-wrap gap-2 print:text-black">
+           <span className="bg-blue-100 text-blue-700 px-1 rounded print:bg-transparent print:text-black print:border print:border-slate-300">{r.fijos||0} Fijos</span>
+           <span className="bg-yellow-100 text-yellow-700 px-1 rounded print:bg-transparent print:text-black print:border print:border-slate-300">{r.tickets||0} Tickets</span>
+           {r.catequesis>0 && <span className="bg-indigo-100 text-indigo-700 px-1 rounded flex gap-1 items-center print:bg-transparent print:text-black"><BookOpen className="w-3 h-3"/> {r.catequesis}</span>}
+           {r.robotica>0 && <span className="bg-indigo-100 text-indigo-700 px-1 rounded flex gap-1 items-center print:bg-transparent print:text-black"><Bot className="w-3 h-3"/> {r.robotica}</span>}
        </div>
-       {r.especiales?.length > 0 && <div className="mt-2 pl-2 border-l-4 border-green-400 bg-green-50 rounded py-1 text-sm space-y-1">
+       
+       {r.profesorNombre && (
+         <div className="mt-2 text-xs text-indigo-800 font-bold bg-indigo-50 p-2 rounded border border-indigo-100 flex gap-2 items-center print:bg-white print:border-black">
+            <UserCheck className="w-4 h-4" />
+            <span>Profesor: {r.profesorNombre}</span>
+         </div>
+       )}
+
+       {r.ausencias && (
+         <div className="mt-2 text-xs text-red-700 font-bold bg-red-50 p-2 rounded border border-red-100 flex gap-2 items-start print:bg-white print:border-black print:text-black">
+            <UserX className="w-4 h-4 shrink-0" />
+            <span>Faltan Alérgicos: {r.ausencias}</span>
+         </div>
+       )}
+
+       {r.especiales?.length > 0 && <div className="mt-2 pl-2 border-l-4 border-green-400 bg-green-50 rounded py-1 text-sm space-y-1 print:bg-white print:border-black">
            {r.especiales.map((e,i)=><div key={i}><strong>{e.nombre}</strong>: {e.dietaBlanda?'Blanda. ':''}{e.nota}</div>)}
        </div>}
     </div>
@@ -460,42 +486,63 @@ function AdminView({ registros, selectedDate, setSelectedDate, loading }) {
 
   return (
     <div className="space-y-4 animate-in fade-in">
-      <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-200 flex justify-between items-center">
+      {(stats.totalDietas > 0 || stats.totalAusencias > 0) && (
+        <div className="bg-orange-100 p-4 rounded-xl border border-orange-300 flex justify-between items-center print:border-black print:bg-white">
+           <div className="flex gap-4">
+              {stats.totalDietas > 0 && <div className="font-bold text-orange-800 flex gap-2 items-center"><Salad className="w-5 h-5"/> {stats.totalDietas} Dietas Esp.</div>}
+              {stats.totalAusencias > 0 && <div className="font-bold text-red-700 flex gap-2 items-center"><AlertTriangle className="w-5 h-5"/> {stats.totalAusencias} Ausencias Esp.</div>}
+           </div>
+        </div>
+      )}
+
+      <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-200 flex justify-between items-center print:hidden">
          <div className="flex gap-2 font-bold text-slate-700 items-center"><History className="text-blue-600"/> Historial</div>
          <input type="date" value={selectedDate} onChange={e=>setSelectedDate(e.target.value)} className="font-bold text-slate-700 bg-transparent outline-none cursor-pointer"/>
       </div>
-      <div className="grid grid-cols-3 gap-2 text-center">
+      
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-center print:hidden">
         <div className="bg-pink-50 p-2 rounded border border-pink-100"><div className="text-xs font-bold text-pink-500">INFANTIL</div><div className="text-xl font-black text-pink-700">{stats.totInf}</div></div>
         <div className="bg-indigo-50 p-2 rounded border border-indigo-100"><div className="text-xs font-bold text-indigo-500">PRIMARIA</div><div className="text-xl font-black text-indigo-700">{stats.totPri}</div></div>
+        <div className="bg-yellow-50 p-2 rounded border border-yellow-200"><div className="text-xs font-bold text-yellow-600">TICKETS</div><div className="text-xl font-black text-yellow-700">{stats.totTickets}</div></div>
         <div className="bg-green-50 p-2 rounded border border-green-100"><div className="text-xs font-bold text-green-500">TOTAL</div><div className="text-xl font-black text-green-700">{stats.total}</div></div>
       </div>
-      <button onClick={handleSendEmail} className="w-full bg-slate-800 text-white py-3 rounded-xl font-bold shadow flex justify-center gap-2 active:scale-95 transition-all"><Send className="w-4 h-4"/> Generar Correo</button>
       
-      {/* --- GRID DE DOS COLUMNAS --- */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        
-        {/* COLUMNA INFANTIL */}
-        <div className="bg-white rounded-xl shadow overflow-hidden h-fit border border-pink-100">
-          <div className="bg-pink-50 px-4 py-2 border-b border-pink-100 flex justify-between items-center">
-             <h3 className="font-bold text-pink-700 text-sm flex gap-2 items-center"><Shapes className="w-4 h-4"/> INFANTIL</h3>
-             {loading && <RefreshCw className="w-3 h-3 animate-spin text-pink-400" />}
+      <div className="flex gap-2 print:hidden">
+        <button onClick={handlePrint} className="w-full bg-slate-800 text-white py-3 rounded-xl font-bold shadow flex justify-center gap-2 active:scale-95 transition-all"><Printer className="w-5 h-5"/> Imprimir Resumen</button>
+      </div>
+      
+      {/* Resumen para Impresión */}
+      <div className="hidden print:block mb-4 text-center border-b pb-4">
+        <h1 className="text-xl font-bold mb-2">Resumen Comedor - {new Date(selectedDate).toLocaleDateString()}</h1>
+        <div className="flex justify-center gap-4 text-sm font-bold flex-wrap">
+           <span>INFANTIL: {stats.totInf}</span>
+           <span>PRIMARIA: {stats.totPri}</span>
+           <span>(TICKETS: {stats.totTickets})</span>
+           <span className="text-lg border-2 border-black px-2 rounded">TOTAL: {stats.total}</span>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 print:grid-cols-2 print:gap-8">
+        <div className="bg-white rounded-xl shadow overflow-hidden h-fit border border-pink-100 print:shadow-none print:border-gray-300">
+          <div className="bg-pink-50 px-4 py-2 border-b border-pink-100 flex justify-between items-center print:bg-gray-100 print:border-gray-300">
+             <h3 className="font-bold text-pink-700 text-sm flex gap-2 items-center print:text-black"><Shapes className="w-4 h-4"/> INFANTIL</h3>
+             {loading && <RefreshCw className="w-3 h-3 animate-spin text-pink-400 print:hidden" />}
           </div>
-          <div className="divide-y divide-pink-50">
+          <div className="divide-y divide-pink-50 print:divide-gray-200">
             {stats.infantil.length > 0 ? stats.infantil.map(renderRow) : <div className="p-6 text-center text-slate-400 text-sm italic">Sin datos de Infantil.</div>}
           </div>
         </div>
 
-        {/* COLUMNA PRIMARIA */}
-        <div className="bg-white rounded-xl shadow overflow-hidden h-fit border border-indigo-100">
-          <div className="bg-indigo-50 px-4 py-2 border-b border-indigo-100 flex justify-between items-center">
-             <h3 className="font-bold text-indigo-700 text-sm flex gap-2 items-center"><Backpack className="w-4 h-4"/> PRIMARIA</h3>
-             {loading && <RefreshCw className="w-3 h-3 animate-spin text-indigo-400" />}
+        <div className="bg-white rounded-xl shadow overflow-hidden h-fit border border-indigo-100 print:shadow-none print:border-gray-300">
+          <div className="bg-indigo-50 px-4 py-2 border-b border-indigo-100 flex justify-between items-center print:bg-gray-100 print:border-gray-300">
+             <h3 className="font-bold text-indigo-700 text-sm flex gap-2 items-center print:text-black"><Backpack className="w-4 h-4"/> PRIMARIA</h3>
+             {loading && <RefreshCw className="w-3 h-3 animate-spin text-indigo-400 print:hidden" />}
           </div>
-          <div className="divide-y divide-indigo-50">
+          <div className="divide-y divide-indigo-50 print:divide-gray-200">
             {stats.primaria.length > 0 ? stats.primaria.map(renderRow) : <div className="p-6 text-center text-slate-400 text-sm italic">Sin datos de Primaria.</div>}
           </div>
         </div>
-
       </div>
     </div>
   );
+}
